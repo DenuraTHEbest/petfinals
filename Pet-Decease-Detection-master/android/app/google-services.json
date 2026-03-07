@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "235448316706",
+    "project_id": "ishipetpals",
+    "storage_bucket": "ishipetpals.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:235448316706:android:48db6f228c330740abeb7b",
+        "android_client_info": {
+          "package_name": "com.example.pet_dicease_detection"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqSOc-3WGjhoap-dQ_l95Q0jlKuVAASq4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

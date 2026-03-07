@@ -1,0 +1,14 @@
+                      precision    recall  f1-score   support
+
+      Skin_condition       0.88      0.79      0.83        67
+       eye_condition       0.57      0.92      0.71        13
+      oral_condition       0.79      0.94      0.86        16
+respiratory_systemic       0.76      0.69      0.72        42
+
+            accuracy                           0.79       138
+           macro avg       0.75      0.84      0.78       138
+        weighted avg       0.81      0.79      0.79       138
+
+
+Class Indices:
+{0: 'Skin_condition', 1: 'eye_condition', 2: 'oral_condition', 3: 'respiratory_systemic'}

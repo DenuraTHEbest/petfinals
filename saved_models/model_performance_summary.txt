@@ -1,0 +1,9 @@
+MODEL PERFORMANCE SUMMARY
+================================================================================
+
+ Model        Accuracy Precision Recall F1-Score
+STAGE1 0.6588 (65.88%)    0.8008 0.6588   0.7156
+
+
+STAGE1:
+  Needs improvement (65.9%)

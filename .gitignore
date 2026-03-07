@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# TensorFlow
+*.h5
+*.tflite
+
+# Datasets
+dataset/
+Stage1/
+Stage2/
+
+# Flutter
+build/
+.dart_tool/
+.packages
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store

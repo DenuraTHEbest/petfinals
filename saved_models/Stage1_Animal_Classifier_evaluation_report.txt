@@ -1,0 +1,22 @@
+Evaluation Report for Stage1_Animal_Classifier
+================================================================================
+
+OVERALL METRICS:
+Accuracy:  0.6588 (65.88%)
+Precision: 0.8008 (80.08%)
+Recall:    0.6588 (65.88%)
+F1-Score:  0.7156 (71.56%)
+
+CLASSIFICATION REPORT:
+              precision    recall  f1-score   support
+
+         cat     0.1153    0.3028    0.1670       601
+         dog     0.8881    0.7041    0.7854      4721
+
+    accuracy                         0.6588      5322
+   macro avg     0.5017    0.5035    0.4762      5322
+weighted avg     0.8008    0.6588    0.7156      5322
+
+PER-CLASS ACCURACY:
+cat: 0.3028 (30.28%)
+dog: 0.7041 (70.41%)
