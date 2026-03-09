@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-// We will create this service next
 import '../services/disease_detection_service.dart'; 
 
 class PlaceholderScreen extends StatefulWidget {
@@ -16,7 +15,9 @@ class PlaceholderScreen extends StatefulWidget {
 class _PlaceholderScreenState extends State<PlaceholderScreen> {
   File? _selectedImage;
   bool _isAnalyzing = false;
-  String _analysisResult = "Upload an image to detect diseases.";
+  
+  // We use 'dynamic' so it can hold either a "Status String" or the "Result Map"
+  dynamic _analysisResult = "Select an image to begin"; 
   
   final ImagePicker _picker = ImagePicker();
   final DiseaseDetectionService _detectionService = DiseaseDetectionService();
@@ -26,7 +27,7 @@ class _PlaceholderScreenState extends State<PlaceholderScreen> {
     if (pickedFile != null) {
       setState(() {
         _selectedImage = File(pickedFile.path);
-        _analysisResult = "Ready to analyze...";
+        _analysisResult = "Ready to analyze... 🐾";
       });
     }
   }
@@ -36,24 +37,53 @@ class _PlaceholderScreenState extends State<PlaceholderScreen> {
 
     setState(() {
       _isAnalyzing = true;
-      _analysisResult = "Analyzing image... 🐾";
+      _analysisResult = "Connecting to server...";
     });
 
     try {
-      // Calls our routing logic service
       final result = await _detectionService.analyzePetImage(_selectedImage!);
       setState(() {
-        _analysisResult = result;
+        _analysisResult = result; // This is now the Map from your backend
       });
     } catch (e) {
       setState(() {
-        _analysisResult = "Error analyzing image: $e";
+        _analysisResult = "Connection Error: Ensure backend is running.";
       });
     } finally {
       setState(() {
-        _isAnalyzing = false;
+        _isAnalyzing = false; // This stops the loading spinner
       });
     }
+  }
+
+  // --- NEW: This helper function prevents the UI crash ---
+  Widget _buildResultDisplay() {
+    if (_analysisResult is String) {
+      return Text(
+        _analysisResult,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+        textAlign: TextAlign.center,
+      );
+    } else if (_analysisResult is Map) {
+      // Extracting the data from your backend JSON
+      final species = _analysisResult['species'] ?? "Unknown";
+      final diagnosis = _analysisResult['diagnosis'] ?? "No diagnosis";
+      final source = _analysisResult['analysis_source'] ?? "AI";
+
+      return Column(
+        children: [
+          Text("Detected: $species", 
+               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue)),
+          const Divider(height: 20),
+          Text(diagnosis, 
+               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400)),
+          const SizedBox(height: 10),
+          Text("Source: $source", 
+               style: const TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic)),
+        ],
+      );
+    }
+    return const Text("Waiting for data...");
   }
 
   @override
@@ -65,27 +95,21 @@ class _PlaceholderScreenState extends State<PlaceholderScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Image Preview
             if (_selectedImage != null)
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.file(
-                  _selectedImage!,
-                  height: 300,
-                  fit: BoxFit.cover,
-                ),
+                child: Image.file(_selectedImage!, height: 300, fit: BoxFit.cover),
               )
             else
               Container(
                 height: 300,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Center(
-                  child: Icon(Icons.pets, size: 80, color: Colors.grey),
-                ),
+                decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(12)),
+                child: const Center(child: Icon(Icons.pets, size: 80, color: Colors.grey)),
               ),
             const SizedBox(height: 20),
+            
+            // Buttons
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
@@ -102,28 +126,27 @@ class _PlaceholderScreenState extends State<PlaceholderScreen> {
               ],
             ),
             const SizedBox(height: 20),
+            
+            // Analyze Button
             ElevatedButton(
               onPressed: _isAnalyzing || _selectedImage == null ? null : _analyzeImage,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              child: _isAnalyzing
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('Detect Disease', style: TextStyle(fontSize: 18)),
+              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+              child: _isAnalyzing 
+                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Text('Detect Disease'),
             ),
             const SizedBox(height: 30),
+            
+            // Result Box
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.blue[50],
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue[200]!),
+                boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                border: Border.all(color: Colors.blue.shade100),
               ),
-              child: Text(
-                _analysisResult,
-                style: const TextStyle(fontSize: 16, height: 1.5),
-                textAlign: TextAlign.center,
-              ),
+              child: _buildResultDisplay(), // Uses the helper widget
             ),
           ],
         ),

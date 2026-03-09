@@ -1,54 +1,49 @@
 import 'dart:io';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
-// import 'package:http/http.dart' as http; // For your custom backend API calls
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:path/path.dart';
 
 class DiseaseDetectionService {
-  
-  Future<String> analyzePetImage(File image) async {
-    // 1. Send image to Model 1 (Your custom API endpoint / TFLite)
-    String petType = await _runModel1(image);
+  // The special alias for the Android Emulator to reach your computer's localhost
+  final String _baseUrl = "http://10.0.2.2:8000/analyze-pet";
 
-    // 2. Branching Logic
-    if (petType.toLowerCase() == 'dog' || petType.toLowerCase() == 'cat') {
-      // Send to Model 2
-      return await _runModel2(image, petType);
-    } else {
-      // Send to Gemini
-      return await _runGeminiAnalysis(image, petType);
+  Future<Map<String, dynamic>> analyzePetImage(File image) async {
+    try {
+      // Create a multi-part request
+      var request = http.MultipartRequest('POST', Uri.parse(_baseUrl));
+      
+      // Attach the image file
+      var stream = http.ByteStream(image.openRead());
+      var length = await image.length();
+      var multipartFile = http.MultipartFile(
+        'file', // This must match the 'file: UploadFile' name in your Python code
+        stream,
+        length,
+        filename: basename(image.path),
+      );
+
+      request.files.add(multipartFile);
+
+      // Send the request to your Python backend
+      var response = await request.send();
+      var responseData = await http.Response.fromStream(response);
+
+      if (response.statusCode == 200) {
+        // Return the parsed JSON from your backend
+        return json.decode(responseData.body);
+      } else {
+        return {
+          "species": "Error",
+          "diagnosis": "Server returned status: ${response.statusCode}",
+          "analysis_source": "Network"
+        };
+      }
+    } catch (e) {
+      return {
+        "species": "Error",
+        "diagnosis": "Connection failed. Is the backend running? Error: $e",
+        "analysis_source": "Network"
+      };
     }
-  }
-
-  Future<String> _runModel1(File image) async {
-    // TODO: Implement HTTP POST request to your Python backend for Model 1
-    // Example: return "cow"; 
-    await Future.delayed(const Duration(seconds: 1)); // Mock delay
-    return "dog"; // Hardcoded for testing, replace with actual API call
-  }
-
-  Future<String> _runModel2(File image, String petType) async {
-    // TODO: Implement HTTP POST request to your Python backend for Model 2
-    await Future.delayed(const Duration(seconds: 1)); // Mock delay
-    return "The $petType appears healthy, but monitor for mild dermatitis.";
-  }
-
-  Future<String> _runGeminiAnalysis(File image, String petType) async {
-    final apiKey = dotenv.env['GEMINI_API_KEY'];
-    if (apiKey == null) throw Exception('Gemini API key not found in .env');
-
-    final model = GenerativeModel(
-      model: 'gemini-1.5-pro', // or flash depending on your needs
-      apiKey: apiKey,
-    );
-
-    final prompt = TextPart("Analyze this image of a $petType. Identify any visible signs of disease or health issues. Provide a concise, professional diagnosis.");
-    final imageBytes = await image.readAsBytes();
-    final imagePart = DataPart('image/jpeg', imageBytes);
-
-    final response = await model.generateContent([
-      Content.multi([prompt, imagePart])
-    ]);
-
-    return response.text ?? "Could not generate analysis from Gemini.";
   }
 }

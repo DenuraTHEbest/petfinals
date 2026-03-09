@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../widgets/primary_button.dart';
 import 'result_screen.dart';
-
+import '../services/disease_detection_service.dart';
 class UploadScreen extends StatefulWidget {
   const UploadScreen({super.key});
 
@@ -13,6 +13,7 @@ class UploadScreen extends StatefulWidget {
 
 class _UploadScreenState extends State<UploadScreen> {
   File? imageFile;
+  final DiseaseDetectionService _apiService = DiseaseDetectionService();
 
   Future<void> pickImage() async {
     final picker = ImagePicker();
@@ -51,14 +52,29 @@ class _UploadScreenState extends State<UploadScreen> {
               text: 'Analyze',
               onPressed: imageFile == null
                   ? null
-                  : () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const ResultScreen(),
-                  ),
-                );
-              },
+                  : () async {
+                      // 1. Show loading indicator
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) => const Center(child: CircularProgressIndicator()),
+                      );
+
+                      // 2. Call the service (returns a Map now)
+                      final result = await DiseaseDetectionService().analyzePetImage(imageFile!);
+
+                      // 3. Remove loading indicator
+                      if (!mounted) return;
+                      Navigator.pop(context);
+
+                      // 4. Navigate to ResultScreen and pass the Map
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ResultScreen(result: result),
+                        ),
+                      );
+                    },
             ),
           ],
         ),
