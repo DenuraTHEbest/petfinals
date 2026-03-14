@@ -4,8 +4,8 @@ __pycache__/
 *.pyo
 
 # TensorFlow
-*.h5
-*.tflite
+#*.h5
+#*.tflite
 
 # Datasets
 dataset/
