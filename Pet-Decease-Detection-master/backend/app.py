@@ -13,22 +13,45 @@ load_dotenv()
 app = FastAPI()
 
 # 1. INITIALIZE GEMINI
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+client = genai.Client(
+    api_key=os.getenv("GEMINI_API_KEY"),
+    http_options={'api_version': 'v1'}
+)
 
+# Updated Diagnostic Block
 print("\n--- 🔍 Checking Gemini API Access ---")
 try:
     for m in client.models.list():
-        if "generateContent" in m.supported_methods:
-            print(f"✅ Available Model: {m.name}")
+        # We removed the method filter so we can see every single model name
+        print(f"✅ Found Model: {m.name}")
 except Exception as e:
-    print(f"❌ Could not list models: {e}")
+    print(f"❌ Gemini Access Check Failed: {e}")
 print("------------------------------------\n")
-# 2. UPDATED LABELS (Deer removed, indices shifted)
-# Alphabetical order of your training folders
+
+# 2. UPDATED LABELS (Cleaned up formatting to remove underscores and capitalize)
 MODEL1_LABELS = {0: "Cat", 1: "Cow", 2: "Dog", 3: "Goat", 4: "Hen", 5: "Rabbit", 6: "Sheep"} 
 
-CAT_DISEASE_LABELS = {0: "Dental_Disease", 1: "Eye_Infection", 2: "Fungal_Infection", 3:"normal", 4:"Panleukopenia", 5:"Scabies", 6:"Skin_Allergy"}
-DOG_DISEASE_LABELS = {0: "Dental_Disease", 1: "eye_infection", 2: "Hot_Spots", 3: "Kennel_Cough", 4:"Mange", 5:"normal", 6:"Parvovirus", 7:"Skin_Allergy", 8:"Tick_Infestation"}
+CAT_DISEASE_LABELS = {
+    0: "Dental Disease", 
+    1: "Eye Infection", 
+    2: "Fungal Infection", 
+    3: "Normal", 
+    4: "Panleukopenia", 
+    5: "Scabies", 
+    6: "Skin Allergy"
+}
+
+DOG_DISEASE_LABELS = {
+    0: "Dental Disease", 
+    1: "Eye Infection", 
+    2: "Hot Spots", 
+    3: "Kennel Cough", 
+    4: "Mange", 
+    5: "Normal", 
+    6: "Parvovirus", 
+    7: "Skin Allergy", 
+    8: "Tick Infestation"
+}
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -84,37 +107,52 @@ async def analyze_pet(file: UploadFile = File(...)):
     image_bytes = await file.read()
     input_data = preprocess_image(image_bytes)
     
-    # STEP 1: Identify Animal
+    # STEP 1: Identify Animal using your TFLite model
     species_name, confidence = get_prediction(model1, input_data, MODEL1_LABELS, "Animal Classifier")
     species = species_name.lower()
 
+    # Pre-set the result dictionary
     result = {"species": species_name, "confidence": confidence}
 
     # STEP 2: Routing Logic
     if species == "cat":
         log_event("INFO", "Routing to Internal Cat Model")
         diag, _ = get_prediction(cat_model, input_data, CAT_DISEASE_LABELS, "Cat Model")
-        result.update({"analysis_source": "Internal Cat Model", "diagnosis": diag})
+        result.update({"diagnosis": diag})
     
     elif species == "dog":
         log_event("INFO", "Routing to Internal Dog Model")
         diag, _ = get_prediction(dog_model, input_data, DOG_DISEASE_LABELS, "Dog Model")
-        result.update({"analysis_source": "Internal Dog Model", "diagnosis": diag})
+        result.update({"diagnosis": diag})
     
     else:
-        # STEP 3: Gemini Fallback for Cow, Hen, Goat, Rabbit, Sheep
+        # STEP 3: Gemini Fallback for other animals OR Unknown Animals
         log_event("GEMINI", f"Detected {species_name}. Triggering Gemini AI fallback...")
         try:
             img_pil = Image.open(io.BytesIO(image_bytes))
-            prompt = f"Analyze this {species_name} for visible diseases, infections, or injuries. If it looks healthy, say 'The animal appears healthy'."
+            
+            # THE UPGRADED PROMPT
+            prompt = f"""
+            You are an expert veterinarian. 
+            1. First, identify if this animal is a Cow, Goat, Hen, Rabbit, or Sheep.
+            2. If it IS one of those, identify the single most likely visible disease or say 'Normal'. 
+               Reply ONLY with the condition name (e.g., 'Fowl Pox').
+            3. If the animal is NOT a Cat, Cow, Dog, Goat, Hen, Rabbit, or Sheep:
+               Reply EXACTLY with this message: 'The data for this species will be updated in an upcoming version. Thank you for your patience as we expand our care capabilities.'
+            4. Do not include any other text, punctuation, or explanations.
+            """
+            
             response = client.models.generate_content(
-            model="gemini-1.5-flash-latest", 
-            contents=[prompt, img_pil]
-)
-            result.update({"analysis_source": "Gemini AI", "diagnosis": response.text})
+                model="gemini-2.5-flash-lite", 
+                contents=[prompt, img_pil]
+            )
+            
+            clean_diagnosis = response.text.strip()
+            result.update({"diagnosis": clean_diagnosis})
+            
         except Exception as e:
             log_event("ERROR", f"Gemini Error: {str(e)}")
-            result.update({"analysis_source": "Error", "diagnosis": "Gemini analysis failed."})
+            result.update({"diagnosis": "Analysis service is temporarily unavailable. Please try again later."})
 
     print("="*50)
     return result
