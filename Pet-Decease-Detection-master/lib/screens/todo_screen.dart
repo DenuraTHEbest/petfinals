@@ -3,9 +3,8 @@ import 'package:table_calendar/table_calendar.dart';
 import '../main.dart';
 import '../widgets/add_todo_dialog.dart';
 import '../widgets/edit_todo_dialog.dart';
-import 'package:pet_care_app/models/todo_model.dart' hide Todo;
-import 'package:pet_care_app/widgets/edit_todo_dialog.dart';
-import 'package:pet_care_app/widgets/add_todo_dialog.dart'; // Optional if you create this
+import '../services/appointment_manager.dart';
+import '../utils/pet_todo_list.dart';
 
 class TodoScreen extends StatefulWidget {
   const TodoScreen({super.key});
@@ -29,11 +28,35 @@ class _TodoScreenState extends State<TodoScreen> {
       DateTime.now().day,
     );
     _focusedDay = _selectedDay;
+    AppointmentManager.instance.addListener(_onAppointmentsChanged);
   }
 
+  @override
+  void dispose() {
+    AppointmentManager.instance.removeListener(_onAppointmentsChanged);
+    super.dispose();
+  }
+
+  void _onAppointmentsChanged() {
+    if (mounted) setState(() {});
+  }
+
+  // Get local todos for a day
   List<Todo> _getTodosForDay(DateTime day) {
     final normalizedDay = DateTime(day.year, day.month, day.day);
     return _todos[normalizedDay] ?? [];
+  }
+
+  // Get appointments from AppointmentManager for a day
+  List<PetTask> _getAppointmentsForDay(DateTime day) {
+    return AppointmentManager.instance.getTasksForDate(day);
+  }
+
+  // Combined event count for calendar dots
+  List<dynamic> _getAllEventsForDay(DateTime day) {
+    final localTodos = _getTodosForDay(day);
+    final appointments = _getAppointmentsForDay(day);
+    return [...localTodos, ...appointments];
   }
 
   void _addTodo(String title, String? description, DateTime date, TimeOfDay? time) {
@@ -63,14 +86,12 @@ class _TodoScreenState extends State<TodoScreen> {
     final newNormalizedDay = DateTime(date.year, date.month, date.day);
 
     setState(() {
-      // Remove from old date
       final todo = _todos[oldNormalizedDay]![index];
       _todos[oldNormalizedDay]!.removeAt(index);
       if (_todos[oldNormalizedDay]!.isEmpty) {
         _todos.remove(oldNormalizedDay);
       }
 
-      // Add to new date with updated info
       if (_todos[newNormalizedDay] == null) {
         _todos[newNormalizedDay] = [];
       }
@@ -152,20 +173,28 @@ class _TodoScreenState extends State<TodoScreen> {
   @override
   Widget build(BuildContext context) {
     final todosForSelectedDay = _getTodosForDay(_selectedDay);
+    final appointmentsForSelectedDay = _getAppointmentsForDay(_selectedDay);
 
-    // Sort todos by time
-    final sortedTodos = List.from(todosForSelectedDay)
+    // Build combined list: todos first, then appointments
+    final List<dynamic> combinedItems = [];
+
+    // Sort local todos by time
+    final sortedTodos = List<Todo>.from(todosForSelectedDay)
       ..sort((a, b) {
         if (a.time == null && b.time == null) return 0;
         if (a.time == null) return 1;
         if (b.time == null) return -1;
-        final aHour = a.time!.hour;
-        final bHour = b.time!.hour;
-        final aMinute = a.time!.minute;
-        final bMinute = b.time!.minute;
-        if (aHour != bHour) return aHour.compareTo(bHour);
-        return aMinute.compareTo(bMinute);
+        if (a.time!.hour != b.time!.hour) return a.time!.hour.compareTo(b.time!.hour);
+        return a.time!.minute.compareTo(b.time!.minute);
       });
+
+    combinedItems.addAll(sortedTodos);
+    combinedItems.addAll(appointmentsForSelectedDay);
+
+    final totalPending = sortedTodos.where((t) => !t.isCompleted).length +
+        appointmentsForSelectedDay.where((a) => !a.isCompleted).length;
+    final totalCompleted = sortedTodos.where((t) => t.isCompleted).length +
+        appointmentsForSelectedDay.where((a) => a.isCompleted).length;
 
     return Scaffold(
       appBar: AppBar(
@@ -207,7 +236,7 @@ class _TodoScreenState extends State<TodoScreen> {
                 _focusedDay = focusedDay;
               });
             },
-            eventLoader: _getTodosForDay,
+            eventLoader: _getAllEventsForDay,
             calendarStyle: CalendarStyle(
               todayDecoration: BoxDecoration(
                 color: Colors.teal.withOpacity(0.5),
@@ -244,23 +273,23 @@ class _TodoScreenState extends State<TodoScreen> {
                       ),
                     ),
                     Text(
-                      '${sortedTodos.where((todo) => !todo.isCompleted).length} pending, ${sortedTodos.where((todo) => todo.isCompleted).length} completed',
+                      '$totalPending pending, $totalCompleted completed',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Colors.grey,
                       ),
                     ),
                   ],
                 ),
-                if (sortedTodos.isNotEmpty)
+                if (combinedItems.isNotEmpty)
                   Chip(
-                    label: Text('${sortedTodos.length} tasks'),
+                    label: Text('${combinedItems.length} tasks'),
                     backgroundColor: Colors.teal.withOpacity(0.1),
                   ),
               ],
             ),
           ),
           Expanded(
-            child: sortedTodos.isEmpty
+            child: combinedItems.isEmpty
                 ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -291,105 +320,18 @@ class _TodoScreenState extends State<TodoScreen> {
             )
                 : ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: sortedTodos.length,
+              itemCount: combinedItems.length,
               itemBuilder: (context, index) {
-                final todo = sortedTodos[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  elevation: 2,
-                  child: ListTile(
-                    leading: Checkbox(
-                      value: todo.isCompleted,
-                      onChanged: (_) => _toggleTodo(
-                        todosForSelectedDay.indexOf(todo),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                    title: Text(
-                      todo.title,
-                      style: TextStyle(
-                        decoration: todo.isCompleted
-                            ? TextDecoration.lineThrough
-                            : null,
-                        color: todo.isCompleted ? Colors.grey : null,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (todo.description != null && todo.description!.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 4),
-                            child: Text(
-                              todo.description!,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: todo.isCompleted ? Colors.grey : Colors.grey[700],
-                              ),
-                            ),
-                          ),
-                        if (todo.time != null)
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.access_time_filled,
-                                size: 14,
-                                color: todo.isCompleted
-                                    ? Colors.grey
-                                    : Colors.teal,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                todo.time!.format(context),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: todo.isCompleted
-                                      ? Colors.grey
-                                      : Colors.teal,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                      ],
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            Icons.edit_outlined,
-                            color: todo.isCompleted ? Colors.grey : null,
-                          ),
-                          onPressed: todo.isCompleted
-                              ? null
-                              : () => _showEditTodoDialog(
-                            todosForSelectedDay.indexOf(todo),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.delete_outline,
-                            color: Colors.red,
-                          ),
-                          onPressed: () => _deleteTodo(
-                            todosForSelectedDay.indexOf(todo),
-                          ),
-                        ),
-                      ],
-                    ),
-                    onTap: () {
-                      if (!todo.isCompleted) {
-                        _showEditTodoDialog(
-                          todosForSelectedDay.indexOf(todo),
-                        );
-                      }
-                    },
-                  ),
-                );
+                final item = combinedItems[index];
+
+                // Render PetTask (appointment) items
+                if (item is PetTask) {
+                  return _buildAppointmentCard(item);
+                }
+
+                // Render regular Todo items
+                final todo = item as Todo;
+                return _buildTodoCard(todo, todosForSelectedDay);
               },
             ),
           ),
@@ -399,6 +341,195 @@ class _TodoScreenState extends State<TodoScreen> {
         onPressed: _showAddTodoDialog,
         backgroundColor: Colors.teal,
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Widget _buildAppointmentCard(PetTask appt) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: Colors.red.shade100, width: 1),
+      ),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: appt.isCompleted ? Colors.green.shade50 : Colors.red.shade50,
+          radius: 18,
+          child: Icon(
+            appt.isCompleted ? Icons.check_circle : Icons.medical_services,
+            color: appt.isCompleted ? Colors.green : Colors.red,
+            size: 20,
+          ),
+        ),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                appt.title,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  decoration: appt.isCompleted ? TextDecoration.lineThrough : null,
+                  color: appt.isCompleted ? Colors.grey : null,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'Vet',
+                style: TextStyle(fontSize: 10, color: Colors.red, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (appt.description.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  appt.description,
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
+              ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                if (appt.dueTime != null) ...[
+                  Icon(Icons.access_time, size: 13, color: Colors.red.shade300),
+                  const SizedBox(width: 3),
+                  Text(
+                    PetTodoListHelpers.formatTime(appt.dueTime) ?? '',
+                    style: TextStyle(fontSize: 12, color: Colors.red.shade400, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                if (appt.petName != null) ...[
+                  Icon(Icons.pets, size: 13, color: Colors.grey.shade400),
+                  const SizedBox(width: 3),
+                  Text(
+                    appt.petName!,
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+        trailing: Checkbox(
+          value: appt.isCompleted,
+          onChanged: (_) {
+            AppointmentManager.instance.toggleTaskCompletion(appt.id);
+          },
+          activeColor: Colors.teal,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTodoCard(Todo todo, List<Todo> todosForSelectedDay) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 2,
+      child: ListTile(
+        leading: Checkbox(
+          value: todo.isCompleted,
+          onChanged: (_) => _toggleTodo(
+            todosForSelectedDay.indexOf(todo),
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        title: Text(
+          todo.title,
+          style: TextStyle(
+            decoration: todo.isCompleted
+                ? TextDecoration.lineThrough
+                : null,
+            color: todo.isCompleted ? Colors.grey : null,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (todo.description != null && todo.description!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  todo.description!,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: todo.isCompleted ? Colors.grey : Colors.grey[700],
+                  ),
+                ),
+              ),
+            if (todo.time != null)
+              Row(
+                children: [
+                  Icon(
+                    Icons.access_time_filled,
+                    size: 14,
+                    color: todo.isCompleted
+                        ? Colors.grey
+                        : Colors.teal,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    todo.time!.format(context),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: todo.isCompleted
+                          ? Colors.grey
+                          : Colors.teal,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: Icon(
+                Icons.edit_outlined,
+                color: todo.isCompleted ? Colors.grey : null,
+              ),
+              onPressed: todo.isCompleted
+                  ? null
+                  : () => _showEditTodoDialog(
+                todosForSelectedDay.indexOf(todo),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(
+                Icons.delete_outline,
+                color: Colors.red,
+              ),
+              onPressed: () => _deleteTodo(
+                todosForSelectedDay.indexOf(todo),
+              ),
+            ),
+          ],
+        ),
+        onTap: () {
+          if (!todo.isCompleted) {
+            _showEditTodoDialog(
+              todosForSelectedDay.indexOf(todo),
+            );
+          }
+        },
       ),
     );
   }

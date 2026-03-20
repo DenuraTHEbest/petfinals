@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(keytool -list -v -keystore $USERPROFILE/.android/debug.keystore -alias androiddebugkey -storepass android)",
+      "Bash(keytool -list -v -keystore \"C:/Users/nimsi/.android/debug.keystore\" -alias androiddebugkey -storepass android)",
+      "Bash(grep -r \"VetFinderScreen\\\\|geolocator\\\\|google_maps\\\\|Vet\\\\|vet\" D:/flutter/Pet-Decease-Detection-master/lib/ --include=*.dart)",
+      "Bash(grep -r \"Happy Paws\\\\|vet\\\\|VET\\\\|clinic\\\\|doctor\" D:/flutter/Pet-Decease-Detection-master/ --include=*.dart --include=*.json)",
+      "Bash(flutter analyze:*)",
+      "Bash(flutter run:*)",
+      "Bash(adb logcat:*)",
+      "Bash(where adb:*)",
+      "Bash($LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe logcat:*)",
+      "Read(//c/Users/nimsi/AppData/Local/Android/Sdk/platform-tools/**)",
+      "Read(//c/Users/nimsi/**)",
+      "Bash(\"C:/Users/nimsi/AppData/Local/Android/Sdk/platform-tools/adb.exe\" logcat:*)",
+      "Bash(flutter pub:*)",
+      "Bash(find D:/flutter/Pet-Decease-Detection-master/.dart_tool -path */geolocator_platform_interface/lib/src/geolocator_platform_interface.dart)",
+      "Bash(find C:/Users/nimsi/AppData/Local/Pub/Cache -path */geolocator-10.*/lib/src/geolocator.dart)",
+      "Bash(find C:/Users/nimsi -path */geolocator-10*/lib/src/geolocator.dart -maxdepth 10)"
+    ]
+  }
+}

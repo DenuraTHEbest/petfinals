@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../widgets/feature_card.dart';
 import '../widgets/animated_paw.dart';
-import '../main.dart';  // Import main.dart to access TodoListScreen
+import 'todo_screen.dart';
 
 import 'weight_chart_screen.dart';
 import 'vet_finder_screen.dart';
@@ -26,6 +27,15 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Pet Care Dashboard 🐾'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Sign Out',
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+            },
+          ),
+        ],
       ),
       body: Stack(
         children: [
@@ -64,7 +74,7 @@ class HomeScreen extends StatelessWidget {
                   icon: Icons.checklist,
                   onTap: () => openScreen(
                     context,
-                    const TodoListScreen(),  // Changed from TodoScreen
+                    const TodoScreen(),
                   ),
                 ),
 
